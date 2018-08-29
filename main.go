@@ -74,16 +74,17 @@ func cmdAdd(args *skel.CmdArgs) error {
 
 	var ip net.IPNet
 	var gw net.IP
-	for allocateErr := ErrUpdateConflict; allocateErr == ErrUpdateConflict; {
+	var allocateErr error
+	for allocateErr = ErrUpdateConflict; allocateErr == ErrUpdateConflict; {
 		ip, gw, allocateErr = allocator.Allocate(namespace, podName)
 	}
-	if err != nil {
-		return fmt.Errorf("unable to get allocation for pod: %v", err)
+	if allocateErr != nil {
+		return fmt.Errorf("unable to get allocation for pod: %v", allocateErr)
 	}
 
 	result := &IPAMResult{}
+	result.CniVersion = current.ImplementedSpecVersion
 	result.AddIP(ip, gw)
-
 	return types.PrintResult(result, current.ImplementedSpecVersion)
 }
 
@@ -114,6 +115,7 @@ func cmdDel(args *skel.CmdArgs) error {
 	}
 
 	result := &IPAMResult{}
+	result.CniVersion = current.ImplementedSpecVersion
 	return types.PrintResult(result, current.ImplementedSpecVersion)
 
 }

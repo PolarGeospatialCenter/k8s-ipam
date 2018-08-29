@@ -3,6 +3,7 @@ package v1alpha1
 import (
 	"math/rand"
 	"net"
+	"time"
 
 	"github.com/azenk/iputils"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,7 +29,8 @@ type IPPool struct {
 }
 
 type IPPoolSpec struct {
-	Pool               PoolNet          `json:"pool"`
+	NetworkIp          net.IP           `json:"networkIp"`
+	NetworkBits        int              `json:"networkBits"`
 	Gateway            net.IP           `json:"gateway"`
 	StaticReservations IPReservationMap `json:"staticReservations"`
 }
@@ -37,37 +39,39 @@ type IPPoolStatus struct {
 	DynamicReservations IPReservationMap
 }
 
-type PoolNet net.IPNet
-
-func (in *PoolNet) DeepCopyInto(out *PoolNet) {
-	*out = *in
-}
-
-func (in *PoolNet) DeepCopy() *PoolNet {
-	out := *in
-	return &out
-}
-
 func (s *IPPoolSpec) Network() *net.IPNet {
-	network := net.IPNet(s.Pool)
-	return &network
+	bits := 128
+	if s.NetworkIp.To4() != nil {
+		bits = 32
+	}
+	network := &net.IPNet{
+		IP:   s.NetworkIp,
+		Mask: net.CIDRMask(s.NetworkBits, bits),
+	}
+	return network
 }
 
 // GetExistingReservation checks if a reservation for this pod exists, if so return the IP
 func (p *IPPool) GetExistingReservation(namespace, podName string) *net.IP {
-	if staticIP := p.Spec.StaticReservations.GetExistingReservation(namespace, podName); staticIP != nil {
-		return staticIP
+	if p.Spec.StaticReservations != nil {
+		if staticIP := p.Spec.StaticReservations.GetExistingReservation(namespace, podName); staticIP != nil {
+			return staticIP
+		}
 	}
 
+	if p.Status.DynamicReservations == nil {
+		return nil
+	}
 	return p.Status.DynamicReservations.GetExistingReservation(namespace, podName)
 }
 
 func (p *IPPool) RandomIP() net.IP {
-	ones, bits := p.Spec.Pool.Mask.Size()
+	rand.Seed(time.Now().UnixNano())
+	ones, bits := p.Spec.Network().Mask.Size()
 	hostBits := bits - ones
 
 	randomBits := rand.Uint64()
-	randIp, _ := iputils.SetBits(p.Spec.Pool.IP, randomBits, uint(ones), uint(hostBits))
+	randIp, _ := iputils.SetBits(p.Spec.Network().IP, randomBits, uint(ones), uint(hostBits))
 	return randIp
 }
 

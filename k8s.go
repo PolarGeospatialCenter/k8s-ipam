@@ -83,7 +83,7 @@ func (k *KubeClient) UpdateIPPool(pool *v1alpha1.IPPool) error {
 		return fmt.Errorf("unable to create client: %v", err)
 	}
 
-	_, err = client.K8sV1alpha1().IPPools().UpdateStatus(pool)
+	_, err = client.K8sV1alpha1().IPPools().Update(pool)
 	return err
 }
 
@@ -96,6 +96,10 @@ func (a *KubernetesAllocator) Allocate(namespace, podName string) (ip net.IPNet,
 	if err != nil {
 		return ip, gateway, err
 	}
+
+	if p.Spec.Network().IP == nil {
+		return ip, gateway, fmt.Errorf("Got nil ip in pool spec.  Please check your syntax and try again.")
+	}
 	gateway = p.Gateway()
 	ip = *p.Spec.Network()
 
@@ -105,7 +109,7 @@ func (a *KubernetesAllocator) Allocate(namespace, podName string) (ip net.IPNet,
 		return ip, gateway, nil
 	}
 	// * Otherwise an IP is chosen randomly
-	var allocatedIP net.IP
+	var allocatedIP *net.IP
 	for allocatedIP == nil {
 		candidateIP := p.RandomIP()
 		if existingPodNS, existingPodName, found := p.GetPodForIP(candidateIP); found {
@@ -115,22 +119,28 @@ func (a *KubernetesAllocator) Allocate(namespace, podName string) (ip net.IPNet,
 				return ip, gateway, err
 			}
 
-			// * If the pod is no longer running, the IP is reclaimed by us.
-			if pod == nil {
-				p.Reserve(namespace, podName, candidateIP)
-			}
 			// * If the pod is running a new IP is chosen and the process is repeated until an ip is assigned.
-			continue
+			if pod != nil {
+				continue
+			}
+
+			// * If the pod is no longer running, the IP is reclaimed by us.
 		}
 
 		if !p.AlreadyReserved(candidateIP) {
 			// If the chosen IP is available it is marked as belonging to this pod in the pool and assigned.
-			allocatedIP = candidateIP
+			allocatedIP = &candidateIP
 			break
 		}
 	}
 
-	ip.IP = allocatedIP
+	ip.IP = *allocatedIP
+
+	if !p.Spec.Network().Contains(*allocatedIP) {
+		return ip, gateway, fmt.Errorf("somehow allocated ip not in network. %v", allocatedIP)
+	}
+
+	p.Reserve(namespace, podName, ip.IP)
 
 	err = a.Client.UpdateIPPool(p)
 	if err != nil && kubeerrors.IsConflict(err) {

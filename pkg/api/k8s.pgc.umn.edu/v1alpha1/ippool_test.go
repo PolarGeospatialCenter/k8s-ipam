@@ -39,8 +39,10 @@ func TestIPReservationMap(t *testing.T) {
 
 func TestIPPoolGetExistingReservation(t *testing.T) {
 	p := IPPool{}
-	_, network, _ := net.ParseCIDR("2001:db8::/64")
-	p.Spec.Pool = PoolNet(*network)
+	networkIP, network, _ := net.ParseCIDR("2001:db8::/64")
+	p.Spec.NetworkIp = networkIP
+	ones, _ := network.Mask.Size()
+	p.Spec.NetworkBits = ones
 
 	if existingIP := p.GetExistingReservation("foo", "bar"); existingIP != nil {
 		t.Errorf("IP returned for unreserved address: %v", existingIP)
@@ -64,8 +66,10 @@ func TestIPPoolGetExistingReservation(t *testing.T) {
 
 func TestIPPoolFreePodReservation(t *testing.T) {
 	p := IPPool{}
-	_, network, _ := net.ParseCIDR("2001:db8::/64")
-	p.Spec.Pool = PoolNet(PoolNet(*network))
+	networkIP, network, _ := net.ParseCIDR("2001:db8::/64")
+	p.Spec.NetworkIp = networkIP
+	ones, _ := network.Mask.Size()
+	p.Spec.NetworkBits = ones
 
 	// Try freeing with no reservations
 	p.FreeDynamicPodReservation("foo", "bar")
@@ -87,8 +91,10 @@ func TestIPPoolFreePodReservation(t *testing.T) {
 
 func TestIPPoolRandomIP(t *testing.T) {
 	p := IPPool{}
-	_, network, _ := net.ParseCIDR("2001:db8::/64")
-	p.Spec.Pool = PoolNet(*network)
+	networkIP, network, _ := net.ParseCIDR("2001:db8::/64")
+	p.Spec.NetworkIp = networkIP
+	ones, _ := network.Mask.Size()
+	p.Spec.NetworkBits = ones
 
 	randomIP := p.RandomIP()
 	if !network.Contains(randomIP) {
@@ -98,13 +104,15 @@ func TestIPPoolRandomIP(t *testing.T) {
 
 func TestIPPoolAlreadyReserved(t *testing.T) {
 	staticPodIP := net.ParseIP("2001:db8::ff32")
-	_, network, _ := net.ParseCIDR("2001:db8::/64")
+	networkIP, network, _ := net.ParseCIDR("2001:db8::/64")
 
 	staticReservations := NewIPReservationMap()
 	staticReservations.Reserve("foo", "bar", staticPodIP)
 
 	p := IPPool{}
-	p.Spec.Pool = PoolNet(*network)
+	p.Spec.NetworkIp = networkIP
+	ones, _ := network.Mask.Size()
+	p.Spec.NetworkBits = ones
 
 	if p.AlreadyReserved(staticPodIP) {
 		t.Errorf("Empty pool claims address is already reserved")
@@ -137,8 +145,10 @@ func TestIPPoolAlreadyReserved(t *testing.T) {
 
 func BenchmarkIPPoolRandomIPv6(b *testing.B) {
 	p := IPPool{}
-	_, network, _ := net.ParseCIDR("2001:db8::/64")
-	p.Spec.Pool = PoolNet(*network)
+	networkIP, network, _ := net.ParseCIDR("2001:db8::/64")
+	p.Spec.NetworkIp = networkIP
+	ones, _ := network.Mask.Size()
+	p.Spec.NetworkBits = ones
 
 	for n := 0; n < b.N; n++ {
 		_ = p.RandomIP()
@@ -147,8 +157,10 @@ func BenchmarkIPPoolRandomIPv6(b *testing.B) {
 
 func BenchmarkIPPoolRandomIPv4(b *testing.B) {
 	p := IPPool{}
-	_, network, _ := net.ParseCIDR("10.0.0.0/13")
-	p.Spec.Pool = PoolNet(*network)
+	networkIP, network, _ := net.ParseCIDR("2001:db8::/64")
+	p.Spec.NetworkIp = networkIP
+	ones, _ := network.Mask.Size()
+	p.Spec.NetworkBits = ones
 
 	for n := 0; n < b.N; n++ {
 		_ = p.RandomIP()
@@ -157,8 +169,10 @@ func BenchmarkIPPoolRandomIPv4(b *testing.B) {
 
 func BenchmarkIPPoolAlreadyReserved(b *testing.B) {
 	p := IPPool{}
-	_, network, _ := net.ParseCIDR("2001:db8::/64")
-	p.Spec.Pool = PoolNet(*network)
+	networkIP, network, _ := net.ParseCIDR("2001:db8::/64")
+	p.Spec.NetworkIp = networkIP
+	ones, _ := network.Mask.Size()
+	p.Spec.NetworkBits = ones
 
 	namespaceCount := b.N / 10000
 	if namespaceCount == 0 {
