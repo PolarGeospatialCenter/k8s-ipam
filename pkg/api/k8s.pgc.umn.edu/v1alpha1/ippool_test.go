@@ -3,8 +3,29 @@ package v1alpha1
 import (
 	"fmt"
 	"net"
+	"strings"
 	"testing"
+
+	"k8s.io/apimachinery/pkg/util/yaml"
 )
+
+func TestIPPoolParse(t *testing.T) {
+	poolString := "apiVersion: k8s.pgc.umn.edu/v1alpha1\nkind: IPPool\nmetadata:\n  name: samplePool\nspec:\n  range: 2001:db8:0:1::/65\n  netmaskBits: 64\n  gateway: \"2001:db8:0:1::1\"\n  staticReservations:\n    namespace-bar:\n      pod-foo: 2001:db8:0:1::23"
+	pool := &IPPool{}
+	err := yaml.NewYAMLOrJSONDecoder(strings.NewReader(poolString), 65536).Decode(pool)
+	if err != nil {
+		t.Errorf("Error parsing yaml: %v", err)
+	}
+
+	if err := pool.Spec.Validate(); err != nil {
+		t.Errorf("Error validating parsed yaml: %v", err)
+	}
+
+	if !pool.Spec.Range.AsNet().IP.Equal(net.ParseIP("2001:db8:0:1::")) {
+		t.Errorf("Wrong ip range parsed: %v", pool.Spec.Range.AsNet())
+	}
+
+}
 
 func TestIPReservationMap(t *testing.T) {
 	m := IPReservationMap{}
@@ -39,7 +60,7 @@ func TestIPReservationMap(t *testing.T) {
 
 func TestIPPoolGetExistingReservation(t *testing.T) {
 	p := IPPool{}
-	p.Spec.Range = IPRange{"2001:db8::/65"}
+	p.Spec.Range = IPRange("2001:db8::/65")
 	p.Spec.NetmaskBits = 64
 
 	if existingIP := p.GetExistingReservation("foo", "bar"); existingIP != nil {
@@ -64,7 +85,7 @@ func TestIPPoolGetExistingReservation(t *testing.T) {
 
 func TestIPPoolFreePodReservation(t *testing.T) {
 	p := IPPool{}
-	p.Spec.Range = IPRange{"2001:db8::/65"}
+	p.Spec.Range = IPRange("2001:db8::/65")
 	p.Spec.NetmaskBits = 64
 
 	// Try freeing with no reservations
@@ -87,7 +108,7 @@ func TestIPPoolFreePodReservation(t *testing.T) {
 
 func TestIPPoolRandomIP(t *testing.T) {
 	p := IPPool{}
-	p.Spec.Range = IPRange{"2001:db8::/65"}
+	p.Spec.Range = IPRange("2001:db8::/65")
 	p.Spec.NetmaskBits = 64
 
 	randomIP := p.RandomIP()
@@ -103,7 +124,7 @@ func TestIPPoolAlreadyReserved(t *testing.T) {
 	staticReservations.Reserve("foo", "bar", staticPodIP)
 
 	p := IPPool{}
-	p.Spec.Range = IPRange{"2001:db8::/65"}
+	p.Spec.Range = IPRange("2001:db8::/65")
 	p.Spec.NetmaskBits = 64
 
 	if p.AlreadyReserved(staticPodIP) {
@@ -137,7 +158,7 @@ func TestIPPoolAlreadyReserved(t *testing.T) {
 
 func BenchmarkIPPoolRandomIPv6(b *testing.B) {
 	p := IPPool{}
-	p.Spec.Range = IPRange{"2001:db8::/65"}
+	p.Spec.Range = IPRange("2001:db8::/65")
 	p.Spec.NetmaskBits = 64
 
 	for n := 0; n < b.N; n++ {
@@ -147,7 +168,7 @@ func BenchmarkIPPoolRandomIPv6(b *testing.B) {
 
 func BenchmarkIPPoolRandomIPv4(b *testing.B) {
 	p := IPPool{}
-	p.Spec.Range = IPRange{"2001:db8::/65"}
+	p.Spec.Range = IPRange("2001:db8::/65")
 	p.Spec.NetmaskBits = 64
 
 	for n := 0; n < b.N; n++ {
@@ -157,7 +178,7 @@ func BenchmarkIPPoolRandomIPv4(b *testing.B) {
 
 func BenchmarkIPPoolAlreadyReserved(b *testing.B) {
 	p := IPPool{}
-	p.Spec.Range = IPRange{"2001:db8::/65"}
+	p.Spec.Range = IPRange("2001:db8::/65")
 	p.Spec.NetmaskBits = 64
 
 	namespaceCount := b.N / 10000

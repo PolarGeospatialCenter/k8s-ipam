@@ -30,7 +30,7 @@ type IPPool struct {
 }
 
 type IPPoolSpec struct {
-	Range              IPRange          `json:"range,inline"`
+	Range              IPRange          `json:"range"`
 	NetmaskBits        int              `json:"netmaskBits"`
 	Gateway            net.IP           `json:"gateway"`
 	StaticReservations IPReservationMap `json:"staticReservations"`
@@ -46,13 +46,11 @@ func (s *IPPoolSpec) GetMask() net.IPMask {
 	return net.CIDRMask(s.NetmaskBits, bits)
 }
 
-type IPRange struct {
-	Cidr string `json:"range"`
-}
+type IPRange string
 
 // AsNet returns the range as a net.IPNet struct.  *Any parse errors are silently ignored.*
 func (r IPRange) AsNet() *net.IPNet {
-	_, network, _ := net.ParseCIDR(r.Cidr)
+	_, network, _ := net.ParseCIDR(string(r))
 	return network
 }
 
@@ -70,7 +68,7 @@ func (r IPRange) RangeMaskBits() int {
 
 // Validate Returns nil if IPRange can be parsed
 func (r IPRange) Validate() error {
-	_, _, err := net.ParseCIDR(r.Cidr)
+	_, _, err := net.ParseCIDR(string(r))
 	return err
 }
 
@@ -170,7 +168,7 @@ func (p *IPPool) FreeDynamicPodReservation(namespace, podName string) {
 func (s IPPoolSpec) Validate() error {
 	// Range is valid
 	if err := s.Range.Validate(); err != nil {
-		return fmt.Errorf("IP range is invalid (%v), please check your syntax.", err)
+		return fmt.Errorf("IP range is invalid (%v), please check your syntax: %v", s.Range, err)
 	}
 
 	// NetmaskBits are valid and less than or equal to Range Bits
