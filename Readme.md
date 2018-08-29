@@ -18,8 +18,10 @@ kind: IPPool
 objectMeta:
   name: samplePool
 spec:
-  pool: "2001:db8:0:1::/65"
+  range: "2001:db8:0:1::/65"
+  netmaskBits: 64
   gateway: "2001:db8:0:1::1"
-  reservedAddresses:
-    pod-foo: 2001:db8:0:1::23
+  staticReservations:
+    namespace-bar:
+      pod-foo: 2001:db8:0:1::23
 ```  

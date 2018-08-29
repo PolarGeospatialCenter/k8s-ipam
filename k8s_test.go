@@ -28,8 +28,8 @@ func TestK8SAllocate(t *testing.T) {
 	a := &KubernetesAllocator{Client: &FakeKubernetesClient{
 		v1alpha1.IPPool{
 			Spec: v1alpha1.IPPoolSpec{
-				NetworkIp:   net.ParseIP("2001:db8::"),
-				NetworkBits: 64,
+				Range:       v1alpha1.IPRange{"2001:db8::/65"},
+				NetmaskBits: 64,
 				Gateway:     net.ParseIP("2001:db8::1"),
 			},
 		}}}

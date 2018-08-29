@@ -1,6 +1,7 @@
 package v1alpha1
 
 import (
+	"fmt"
 	"math/rand"
 	"net"
 	"time"
@@ -29,8 +30,8 @@ type IPPool struct {
 }
 
 type IPPoolSpec struct {
-	NetworkIp          net.IP           `json:"networkIp"`
-	NetworkBits        int              `json:"networkBits"`
+	Range              IPRange          `json:"range,inline"`
+	NetmaskBits        int              `json:"netmaskBits"`
 	Gateway            net.IP           `json:"gateway"`
 	StaticReservations IPReservationMap `json:"staticReservations"`
 }
@@ -39,16 +40,43 @@ type IPPoolStatus struct {
 	DynamicReservations IPReservationMap
 }
 
-func (s *IPPoolSpec) Network() *net.IPNet {
-	bits := 128
-	if s.NetworkIp.To4() != nil {
-		bits = 32
-	}
-	network := &net.IPNet{
-		IP:   s.NetworkIp,
-		Mask: net.CIDRMask(s.NetworkBits, bits),
-	}
+// GetMask returns the netmask for ips allocated in this range
+func (s *IPPoolSpec) GetMask() net.IPMask {
+	bits := s.Range.IPSizeBits()
+	return net.CIDRMask(s.NetmaskBits, bits)
+}
+
+type IPRange struct {
+	Cidr string `json:"range"`
+}
+
+// AsNet returns the range as a net.IPNet struct.  *Any parse errors are silently ignored.*
+func (r IPRange) AsNet() *net.IPNet {
+	_, network, _ := net.ParseCIDR(r.Cidr)
 	return network
+}
+
+// IPSizeBits returns the number of bits required for IPs in this range
+func (r IPRange) IPSizeBits() int {
+	_, bits := r.AsNet().Mask.Size()
+	return bits
+}
+
+// RangeMaskBits returns the number of bits in the pre-allocated portion of this IPRange
+func (r IPRange) RangeMaskBits() int {
+	ones, _ := r.AsNet().Mask.Size()
+	return ones
+}
+
+// Validate Returns nil if IPRange can be parsed
+func (r IPRange) Validate() error {
+	_, _, err := net.ParseCIDR(r.Cidr)
+	return err
+}
+
+// RangeContains returns true if ip is within the range allocated from this pool
+func (p IPPool) RangeContains(ip net.IP) bool {
+	return p.Spec.Range.AsNet().Contains(ip)
 }
 
 // GetExistingReservation checks if a reservation for this pod exists, if so return the IP
@@ -67,11 +95,12 @@ func (p *IPPool) GetExistingReservation(namespace, podName string) *net.IP {
 
 func (p *IPPool) RandomIP() net.IP {
 	rand.Seed(time.Now().UnixNano())
-	ones, bits := p.Spec.Network().Mask.Size()
+	allocationRange := p.Spec.Range.AsNet()
+	ones, bits := allocationRange.Mask.Size()
 	hostBits := bits - ones
 
 	randomBits := rand.Uint64()
-	randIp, _ := iputils.SetBits(p.Spec.Network().IP, randomBits, uint(ones), uint(hostBits))
+	randIp, _ := iputils.SetBits(allocationRange.IP, randomBits, uint(ones), uint(hostBits))
 	return randIp
 }
 
@@ -81,7 +110,7 @@ func (p *IPPool) Gateway() net.IP {
 
 // AlreadyReserved checks the pool to see if the IP is reserved by any pod.  Returns false if IP is not contained in the pool.
 func (p *IPPool) AlreadyReserved(ip net.IP) bool {
-	if !p.Spec.Network().Contains(ip) {
+	if !p.RangeContains(ip) {
 		return false
 	}
 
@@ -96,7 +125,7 @@ func (p *IPPool) AlreadyReserved(ip net.IP) bool {
 
 // GetPodForIP returns the namespace and pod name for the pod associated with a reservation.  found is set to false if no pod is found.
 func (p *IPPool) GetPodForIP(ip net.IP) (namespace, podName string, found bool) {
-	if !p.Spec.Network().Contains(ip) {
+	if !p.RangeContains(ip) {
 		return "", "", false
 	}
 
@@ -135,6 +164,34 @@ func (p *IPPool) FreeDynamicPodReservation(namespace, podName string) {
 	}
 
 	p.Status.DynamicReservations.FreePodReservation(namespace, podName)
+}
+
+// Validate returns nil if there are no obvious errors in IP Pool configuration
+func (s IPPoolSpec) Validate() error {
+	// Range is valid
+	if err := s.Range.Validate(); err != nil {
+		return fmt.Errorf("IP range is invalid (%v), please check your syntax.", err)
+	}
+
+	// NetmaskBits are valid and less than or equal to Range Bits
+	if s.NetmaskBits < 0 || s.NetmaskBits > s.Range.IPSizeBits() {
+		return fmt.Errorf("specified netmask is invalid")
+	}
+
+	if s.NetmaskBits > s.Range.RangeMaskBits() {
+		return fmt.Errorf("specified netmask doesn't completely contain the Range.  Please adjust.")
+	}
+
+	// Gateway must be within specified network
+	containingNetwork := net.IPNet{
+		IP:   s.Range.AsNet().IP,
+		Mask: net.CIDRMask(s.NetmaskBits, s.Range.IPSizeBits()),
+	}
+	if s.Gateway != nil && !containingNetwork.Contains(s.Gateway) {
+		return fmt.Errorf("Gateway must be on the subnet that includes this range.")
+	}
+
+	return nil
 }
 
 type IPReservationMap map[string]map[string]net.IP

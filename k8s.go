@@ -97,11 +97,12 @@ func (a *KubernetesAllocator) Allocate(namespace, podName string) (ip net.IPNet,
 		return ip, gateway, err
 	}
 
-	if p.Spec.Network().IP == nil {
-		return ip, gateway, fmt.Errorf("Got nil ip in pool spec.  Please check your syntax and try again.")
+	if err := p.Spec.Validate(); err != nil {
+		return ip, gateway, fmt.Errorf("IP Pool Spec is invalid.  Please check your configuration.  Error was: %v Got Spec: %v", err, p.Spec)
 	}
+
 	gateway = p.Gateway()
-	ip = *p.Spec.Network()
+	ip = net.IPNet{Mask: p.Spec.GetMask()}
 
 	// * If an IP is already assigned to a pod with a matching name/namespace tuple, that ip is reassigned (any pod that's named the same will get the same IP when relaunched)
 	if existingIP := p.GetExistingReservation(namespace, podName); existingIP != nil {
@@ -136,7 +137,7 @@ func (a *KubernetesAllocator) Allocate(namespace, podName string) (ip net.IPNet,
 
 	ip.IP = *allocatedIP
 
-	if !p.Spec.Network().Contains(*allocatedIP) {
+	if !p.RangeContains(*allocatedIP) {
 		return ip, gateway, fmt.Errorf("somehow allocated ip not in network. %v", allocatedIP)
 	}
 
