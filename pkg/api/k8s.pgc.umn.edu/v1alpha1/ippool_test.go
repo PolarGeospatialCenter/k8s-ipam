@@ -9,6 +9,29 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 )
 
+func TestIPRangeIPSizeBits(t *testing.T) {
+	r := IPRange("10.2.3.64/28")
+	if r.IPSizeBits() != 32 {
+		t.Errorf("Got wrong size for IPv4 address, expecting 32, got %d", r.IPSizeBits())
+	}
+	r = IPRange("2001:db8::1/64")
+	if r.IPSizeBits() != 128 {
+		t.Errorf("Got wrong size for IPv6 address, expecting 128, got %d", r.IPSizeBits())
+	}
+}
+
+func TestIPRangeIPMask(t *testing.T) {
+	r := IPRange("10.2.3.64/28")
+	if ones, bits := r.AsNet().Mask.Size(); ones != 28 || bits != 32 {
+		t.Errorf("Got mask size for IPv4 address, expecting 28 ones and 32 bits, got %d ones and %d bits", ones, bits)
+	}
+	r = IPRange("2001:db8::1/64")
+	if ones, bits := r.AsNet().Mask.Size(); ones != 64 || bits != 128 {
+		t.Errorf("Got mask size for IPv6 address, expecting 64 ones and 128 bits, got %d ones and %d bits", ones, bits)
+	}
+
+}
+
 func TestIPPoolParse(t *testing.T) {
 	poolString := "apiVersion: k8s.pgc.umn.edu/v1alpha1\nkind: IPPool\nmetadata:\n  name: samplePool\nspec:\n  range: 2001:db8:0:1::/65\n  netmaskBits: 64\n  gateway: \"2001:db8:0:1::1\"\n  staticReservations:\n    namespace-bar:\n      pod-foo: 2001:db8:0:1::23"
 	pool := &IPPool{}
@@ -106,10 +129,21 @@ func TestIPPoolFreePodReservation(t *testing.T) {
 	}
 }
 
-func TestIPPoolRandomIP(t *testing.T) {
+func TestIPPoolRandomIPv6(t *testing.T) {
 	p := IPPool{}
 	p.Spec.Range = IPRange("2001:db8::/65")
 	p.Spec.NetmaskBits = 64
+
+	randomIP := p.RandomIP()
+	if !p.RangeContains(randomIP) {
+		t.Errorf("Random ip isn't in network: %v", randomIP)
+	}
+}
+
+func TestIPPoolRandomIPv4(t *testing.T) {
+	p := IPPool{}
+	p.Spec.Range = IPRange("10.2.3.64/28")
+	p.Spec.NetmaskBits = 27
 
 	randomIP := p.RandomIP()
 	if !p.RangeContains(randomIP) {

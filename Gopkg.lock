@@ -3,11 +3,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:d2d22ffba58110734f7967eea6ecc9af4a52754bdf1b730e95df3b311ade1f70"
+  digest = "1:ee1d9affd070661137b14a081aa2ce864fdd5d30baf0f2055bb56ed09e1ff088"
   name = "github.com/azenk/iputils"
   packages = ["."]
   pruneopts = "UT"
-  revision = "a8405f62d18e52f9446ef8d9658e2e17d1eda1bf"
+  revision = "d1883c0677d345c28f243fefa6008f3f044b6e17"
 
 [[projects]]
   digest = "1:fdd07ff1d3b56a4338688dca999e7a09eacab635d450ca9338bfdd81fd817d9e"
@@ -112,15 +112,15 @@
   revision = "9cad4c3443a7200dd6400aef47183728de563a38"
 
 [[projects]]
-  branch = "master"
-  digest = "1:cf296baa185baae04a9a7004efee8511d08e2f5f51d4cbe5375da89722d681db"
+  digest = "1:8ec8d88c248041a6df5f6574b87bc00e7e0b493881dad2e7ef47b11dc69093b5"
   name = "github.com/hashicorp/golang-lru"
   packages = [
     ".",
     "simplelru",
   ]
   pruneopts = "UT"
-  revision = "0fb14efe8c47ae851c0034ed7a448854d3d34cf3"
+  revision = "20f1fb78b0740ba8c3cb143a61e86ba5c8669768"
+  version = "v0.5.0"
 
 [[projects]]
   digest = "1:8eb1de8112c9924d59bf1d3e5c26f5eaa2bfc2a5fcbb92dc1c2e4546d695f277"
@@ -184,7 +184,7 @@
   name = "golang.org/x/crypto"
   packages = ["ssh/terminal"]
   pruneopts = "UT"
-  revision = "614d502a4dac94afa3a6ce146bd1736da82514c6"
+  revision = "182538f80094b6a8efaade63a8fd8e0d9d5843dd"
 
 [[projects]]
   branch = "master"
@@ -202,14 +202,14 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:0dafafed83f125cdc945a014b2dec15e5b5d8cd2d77a2d1e3763120b08ab381b"
+  digest = "1:629034aef6b53eb8ea737e6d82cb5402907e2757fbab5ddf5e74c08b4c6473af"
   name = "golang.org/x/sys"
   packages = [
     "unix",
     "windows",
   ]
   pruneopts = "UT"
-  revision = "4910a1d54f876d7b22162a85f4d066d3ee649450"
+  revision = "fa5fdf94c78965f1aa8423f0cc50b8b8d728b05a"
 
 [[projects]]
   digest = "1:a2ab62866c75542dd18d2b069fec854577a20211d7c0ea6ae746072a1dccdd18"
